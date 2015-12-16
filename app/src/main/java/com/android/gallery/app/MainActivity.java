@@ -1,12 +1,23 @@
 package com.android.gallery.app;
 
+import android.os.Environment;
+import android.support.v4.app.DialogFragment;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import com.turhanoz.android.reactivedirectorychooser.event.OnDirectoryCancelEvent;
+import com.turhanoz.android.reactivedirectorychooser.event.OnDirectoryChosenEvent;
+import com.turhanoz.android.reactivedirectorychooser.ui.DirectoryChooserFragment;
+import com.turhanoz.android.reactivedirectorychooser.ui.OnDirectoryChooserFragmentInteraction;
+
+import java.io.File;
 
 
-public class MainActivity extends ActionBarActivity {
+public class MainActivity extends ActionBarActivity implements OnDirectoryChooserFragmentInteraction {
+
+    File currentRootDirectory = Environment.getExternalStorageDirectory();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,9 +42,27 @@ public class MainActivity extends ActionBarActivity {
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            addDirectoryChooserAsFloatingFragment();
             return true;
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+
+    void addDirectoryChooserAsFloatingFragment() {
+        DialogFragment directoryChooserFragment = DirectoryChooserFragment.newInstance(currentRootDirectory);
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+        directoryChooserFragment.show(transaction, "RDC");
+    }
+
+    @Override
+    public void onEvent(OnDirectoryChosenEvent event) {
+        File directoryChosenByUser = event.getFile();
+    }
+
+    @Override
+    public void onEvent(OnDirectoryCancelEvent event) {
+        int i = 1;
     }
 }
