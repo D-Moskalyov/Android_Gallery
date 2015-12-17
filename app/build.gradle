@@ -37,4 +37,5 @@ dependencies {
     compile ('com.turhanoz.android:reactivedirectorychooser:0.0.13@aar'){
         transitive=true
     }
+    compile 'com.facebook.fresco:fresco:0.7.0+'
 }
