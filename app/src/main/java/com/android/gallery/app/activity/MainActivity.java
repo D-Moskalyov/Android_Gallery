@@ -1,5 +1,7 @@
 package com.android.gallery.app.activity;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Environment;
 import android.support.v4.app.DialogFragment;
 import android.support.v4.app.FragmentTransaction;
@@ -28,17 +30,33 @@ import java.util.List;
 
 public class MainActivity extends ActionBarActivity implements OnDirectoryChooserFragmentInteraction {
 
-    File currentRootDirectory = Environment.getExternalStorageDirectory();
+    SharedPreferences settings;
+    File currentRootDirectory;
     List<String> pictPath;
+
+    private static final int SHOW_PREFERENCES = 1;
+    private static final int START_EXPLORER = 2;
+    private static final int LOAD_PICTURE = 3;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        settings = getSharedPreferences(getString(R.string.preference_file_key), 0);
         pictPath = new ArrayList<String>();
     }
 
+    @Override
+    protected void onPostResume() {
+        super.onPostResume();
+
+        String curDir = settings.getString("currentDir", "def");
+        if(curDir == "def")
+            currentRootDirectory = Environment.getExternalStorageDirectory();
+        else
+            currentRootDirectory = new File(curDir);
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -51,7 +69,9 @@ public class MainActivity extends ActionBarActivity implements OnDirectoryChoose
         int id = item.getItemId();
 
         if (id == R.id.action_settings) {
-            addDirectoryChooserAsFloatingFragment();
+            Intent i = new Intent(this, SettingActivity.class);
+            startActivityForResult(i, SHOW_PREFERENCES);
+            //addDirectoryChooserAsFloatingFragment();
             return true;
         }
 
@@ -66,24 +86,50 @@ public class MainActivity extends ActionBarActivity implements OnDirectoryChoose
     }
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if(requestCode == SHOW_PREFERENCES) {
+            if (resultCode == START_EXPLORER){
+                addDirectoryChooserAsFloatingFragment();
+            }
+            else if(resultCode == LOAD_PICTURE){
+                String path = data.getExtras().getString("path");
+                File pathDir = new File(path);
+                if(pathDir != null & pathDir.exists())
+                    ScanDirectory(pathDir);
+                else {
+                    //delete from prefs
+                }
+            }
+            super.onActivityResult(requestCode, resultCode, data);
+        }
+    }
+
+    @Override
     public void onEvent(OnDirectoryChosenEvent event) {
         File directoryChosenByUser = event.getFile();
+        ScanDirectory(directoryChosenByUser);
+    }
+
+    @Override
+    public void onEvent(OnDirectoryCancelEvent event) {
+        int i = 1;
+    }
+
+    void ScanDirectory(File path){
         FileFilter filter = new FileFilter() {
             @Override
             public boolean accept(File file) {
                 return file.getAbsolutePath().matches("([^\\s]+(\\.(?i)(jpg|jpeg|png|gif|bmp))$)");
             }
         };
-        File[] files = directoryChosenByUser.listFiles(filter);
-        if(files != null & files.length != 0)
+        File[] files = path.listFiles(filter);
+        if(files != null & files.length != 0) {
+            //add to prefs
+            //select as def
             CreateFragments(files);
+        }
         else
             Toast.makeText(this, "Picture not found", Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    public void onEvent(OnDirectoryCancelEvent event) {
-        int i = 1;
     }
 
     void CreateFragments(File[] pictures){

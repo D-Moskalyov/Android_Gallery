@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent">
+
+    <Button
+            android:id="@+id/sel_folder"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/action_sel_fold"
+            android:layout_margin="20px"/>
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/or"
+            android:textSize="25dp"
+            android:layout_gravity="center_horizontal"/>
+
+    <Spinner
+            android:id="@+id/snipper"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:prompt="@string/or"
+            android:layout_margin="20px"/>
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/interval"
+            android:textSize="25dp"
+            android:layout_gravity="center_horizontal"/>
+
+    <SeekBar
+            android:id="@+id/seek"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="20px"
+            android:max="59"/>
+
+    <TextView
+            android:id="@+id/interval"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1 sec"
+            android:textSize="23dp"
+            android:layout_gravity="center_horizontal"/>
+</LinearLayout>
