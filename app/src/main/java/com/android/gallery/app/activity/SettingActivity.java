@@ -4,22 +4,33 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Environment;
+import android.support.v4.app.DialogFragment;
+import android.support.v4.app.FragmentTransaction;
+import android.support.v7.app.ActionBarActivity;
 import android.util.ArraySet;
 import android.view.View;
 import android.widget.*;
 import com.android.gallery.app.R;
+import com.turhanoz.android.reactivedirectorychooser.event.OnDirectoryCancelEvent;
+import com.turhanoz.android.reactivedirectorychooser.event.OnDirectoryChosenEvent;
+import com.turhanoz.android.reactivedirectorychooser.ui.DirectoryChooserFragment;
+import com.turhanoz.android.reactivedirectorychooser.ui.OnDirectoryChooserFragmentInteraction;
 
 import java.io.File;
 import java.io.FileFilter;
 import java.util.*;
 
-public class SettingActivity extends Activity implements AdapterView.OnItemSelectedListener {
+public class SettingActivity extends ActionBarActivity implements AdapterView.OnItemSelectedListener, OnDirectoryChooserFragmentInteraction {
 
     SettingActivity settingActivity;
     SharedPreferences settings;
-    int currentPos;
-    ArrayList<String> colors;
+    File currentRootDirectory;
+    //int currentPos;
+    Set<String> histDir;
+    LinkedList<String> historyDir;
     Spinner spinner;
+
 
     private static final int START_EXPLORER = 2;
     private static final int LOAD_PICTURE = 3;
@@ -30,29 +41,37 @@ public class SettingActivity extends Activity implements AdapterView.OnItemSelec
         setContentView(R.layout.activity_setting);
 
         settingActivity = this;
-        currentPos = 0;
-        colors = new ArrayList<String>();
-        settings = getSharedPreferences(getString(R.string.preference_file_key), 0);
+        //currentPos = 0;
     }
 
     @Override
-    protected void onPostResume() {
-        super.onPostResume();
+    protected void onResume() {
+        super.onResume();
+
+        settings = getSharedPreferences(getString(R.string.preference_file_key), 0);
 
         Button selFolder = (Button) findViewById(R.id.sel_folder);
         spinner = (Spinner) findViewById(R.id.snipper);
         SeekBar seekBar = (SeekBar) findViewById(R.id.seek);
         final TextView interval = (TextView) findViewById(R.id.interval);
 
-        Set<String> histDir = settings.getStringSet("historyDir", new ArraySet<String>());
-        LinkedList<String> historyDir = new LinkedList<String>();
+        seekBar.setProgress(settings.getInt("intervalSH", 2) - 1);
+        interval.setText(String.valueOf(settings.getInt("intervalSH", 2)) + " sec");
+
+        histDir = settings.getStringSet("historyDir", new HashSet<String>());
+        historyDir = new LinkedList<String>();
         String currDir = settings.getString("currentDir", "def");
 
         if(currDir != "def") {
-            histDir.remove(currDir);
+            //histDir.remove(currDir);
             historyDir.addAll(histDir);
+            historyDir.remove(currDir);
             historyDir.addFirst(currDir);
+
+            currentRootDirectory = new File(currDir);
         }
+        else
+            currentRootDirectory = Environment.getExternalStorageDirectory();
 
 //        colors.add("Red");
 //        colors.add("Blue");
@@ -84,7 +103,7 @@ public class SettingActivity extends Activity implements AdapterView.OnItemSelec
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 SharedPreferences.Editor editor = settings.edit();
-                editor.putInt("intervalSH", seekBar.getVerticalScrollbarPosition() + 1);
+                editor.putInt("intervalSH", seekBar.getProgress() + 1);
                 editor.apply();
             }
         });
@@ -92,49 +111,99 @@ public class SettingActivity extends Activity implements AdapterView.OnItemSelec
         selFolder.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                settingActivity.setResult(START_EXPLORER);
-                settingActivity.finish();
+                addDirectoryChooserAsFloatingFragment();
             }
         });
     }
 
     @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override
     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-        if(currentPos != position){
-            File path = new File(colors.get(position));
+//        if(currentPos != position){
+            File path = new File(historyDir.get(position));
             if(!path.exists()){
+                histDir.remove(path.getAbsolutePath());
+                SharedPreferences.Editor editor = settings.edit();
+                editor.putStringSet("historyDir", histDir);
+                editor.apply();
+
                 Toast.makeText(this, "Path not exist", Toast.LENGTH_SHORT).show();
-                //delete from prefs
-                colors.remove(colors.get(position));
-                spinner.setSelection(0, true);
 
+                historyDir.remove(historyDir.get(position));
+                spinner.setSelection(0, true);
+                //currentPos = 0;
                 return;
             }
-            FileFilter filter = new FileFilter() {
-                @Override
-                public boolean accept(File file) {
-                    return file.getAbsolutePath().matches("([^\\s]+(\\.(?i)(jpg|jpeg|png|gif|bmp))$)");
-                }
-            };
-            File[] files = path.listFiles(filter);
+            if(!ScanDirectory(path)){
+//                Intent intent = new Intent();
+//                intent.putExtra("path", path.getAbsolutePath());
+//                this.setResult(LOAD_PICTURE, intent);
+//                //currentPos = position;
+//                //spinner.setSelection(position, true);
 
-            if(files == null || files.length == 0){
-                Toast.makeText(this, "Picture not exist in folder", Toast.LENGTH_SHORT).show();
-                //delete from prefs
-                colors.remove(colors.get(position));
+                histDir.remove(path.getAbsolutePath());
+                SharedPreferences.Editor editor = settings.edit();
+                editor.putStringSet("historyDir", histDir);
+                editor.apply();
+
+                historyDir.remove(path.getAbsolutePath());
                 spinner.setSelection(0, true);
-
-                return;
+                //currentPos = 0;
             }
-            Intent intent = new Intent();
-            intent.putExtra("path", colors.get(position));
-            this.setResult(LOAD_PICTURE, intent);
-            currentPos = position;
-        }
+
+        //}
     }
 
     @Override
     public void onNothingSelected(AdapterView<?> parent) {
         int i = 0;
+    }
+
+    void addDirectoryChooserAsFloatingFragment() {
+        DialogFragment directoryChooserFragment = DirectoryChooserFragment.newInstance(currentRootDirectory);
+        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+        directoryChooserFragment.show(transaction, "RDC");
+    }
+
+    @Override
+    public void onEvent(OnDirectoryCancelEvent onDirectoryCancelEvent) {
+
+    }
+
+    @Override
+    public void onEvent(OnDirectoryChosenEvent onDirectoryChosenEvent) {
+        File directoryChosenByUser = onDirectoryChosenEvent.getFile();
+        if(ScanDirectory(directoryChosenByUser)){
+            histDir.add(directoryChosenByUser.getAbsolutePath());
+            SharedPreferences.Editor editor = settings.edit();
+            editor.putStringSet("historyDir", histDir);
+            editor.apply();
+
+            this.finish();
+        }
+    }
+
+    boolean ScanDirectory(File path){
+        FileFilter filter = new FileFilter() {
+            @Override
+            public boolean accept(File file) {
+                return file.getAbsolutePath().matches("([^\\s]+(\\.(?i)(jpg|jpeg|png|gif|bmp))$)");
+            }
+        };
+        File[] files = path.listFiles(filter);
+        if(files != null & files.length != 0) {
+            Intent intent = new Intent();
+            intent.putExtra("path", path.getAbsolutePath());
+            this.setResult(LOAD_PICTURE, intent);
+            return true;
+        }
+        else {
+            Toast.makeText(this, "Picture not found", Toast.LENGTH_SHORT).show();
+            return false;
+        }
     }
 }

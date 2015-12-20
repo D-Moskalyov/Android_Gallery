@@ -6,6 +6,6 @@
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
     <string name="action_sel_fold">Select Folder</string>
-    <string name="or">or chose from history</string>
+    <string name="or">or choose from history</string>
     <string name="interval">Interval for slide-show:</string>
 </resources>

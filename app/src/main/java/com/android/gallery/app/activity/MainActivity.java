@@ -3,36 +3,26 @@ package com.android.gallery.app.activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Environment;
-import android.support.v4.app.DialogFragment;
-import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
-import android.view.Gravity;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
+import android.view.*;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 import com.android.gallery.app.R;
 import com.android.gallery.app.fragment.FragmentPicture;
-import com.turhanoz.android.reactivedirectorychooser.event.OnDirectoryCancelEvent;
-import com.turhanoz.android.reactivedirectorychooser.event.OnDirectoryChosenEvent;
-import com.turhanoz.android.reactivedirectorychooser.ui.DirectoryChooserFragment;
-import com.turhanoz.android.reactivedirectorychooser.ui.OnDirectoryChooserFragmentInteraction;
-
 import java.io.File;
 import java.io.FileFilter;
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 
-public class MainActivity extends ActionBarActivity implements OnDirectoryChooserFragmentInteraction {
+public class MainActivity extends ActionBarActivity {
 
     SharedPreferences settings;
     File currentRootDirectory;
     List<String> pictPath;
+
+//    int heightScreen;
+//    int widthScreen;
 
     private static final int SHOW_PREFERENCES = 1;
     private static final int START_EXPLORER = 2;
@@ -44,18 +34,21 @@ public class MainActivity extends ActionBarActivity implements OnDirectoryChoose
         setContentView(R.layout.activity_main);
 
         settings = getSharedPreferences(getString(R.string.preference_file_key), 0);
+
+        String curDir = settings.getString("currentDir", "def");
+        if(curDir == "def")
+            currentRootDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+        else
+            currentRootDirectory = new File(curDir);
+
         pictPath = new ArrayList<String>();
     }
 
     @Override
-    protected void onPostResume() {
-        super.onPostResume();
+    protected void onResume() {
+        super.onResume();
 
-        String curDir = settings.getString("currentDir", "def");
-        if(curDir == "def")
-            currentRootDirectory = Environment.getExternalStorageDirectory();
-        else
-            currentRootDirectory = new File(curDir);
+        ScanDirectory(currentRootDirectory);
     }
 
     @Override
@@ -79,41 +72,44 @@ public class MainActivity extends ActionBarActivity implements OnDirectoryChoose
     }
 
 
-    void addDirectoryChooserAsFloatingFragment() {
-        DialogFragment directoryChooserFragment = DirectoryChooserFragment.newInstance(currentRootDirectory);
-        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
-        directoryChooserFragment.show(transaction, "RDC");
-    }
+//    void addDirectoryChooserAsFloatingFragment() {
+//        DialogFragment directoryChooserFragment = DirectoryChooserFragment.newInstance(currentRootDirectory);
+//        FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
+//        directoryChooserFragment.show(transaction, "RDC");
+//    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if(requestCode == SHOW_PREFERENCES) {
             if (resultCode == START_EXPLORER){
-                addDirectoryChooserAsFloatingFragment();
+                //addDirectoryChooserAsFloatingFragment();
             }
             else if(resultCode == LOAD_PICTURE){
                 String path = data.getExtras().getString("path");
-                File pathDir = new File(path);
-                if(pathDir != null & pathDir.exists())
-                    ScanDirectory(pathDir);
-                else {
-                    //delete from prefs
+                if(path.compareTo(currentRootDirectory.getAbsolutePath()) != 0) {
+                    File pathDir = new File(path);
+                    if (pathDir != null & pathDir.exists())
+                        ScanDirectory(pathDir);
+                    else {
+                        ClearHistory(pathDir);
+                        ScanDirectory(currentRootDirectory);
+                    }
                 }
             }
             super.onActivityResult(requestCode, resultCode, data);
         }
     }
 
-    @Override
-    public void onEvent(OnDirectoryChosenEvent event) {
-        File directoryChosenByUser = event.getFile();
-        ScanDirectory(directoryChosenByUser);
-    }
-
-    @Override
-    public void onEvent(OnDirectoryCancelEvent event) {
-        int i = 1;
-    }
+//    @Override
+//    public void onEvent(OnDirectoryChosenEvent event) {
+//        File directoryChosenByUser = event.getFile();
+//        ScanDirectory(directoryChosenByUser);
+//    }
+//
+//    @Override
+//    public void onEvent(OnDirectoryCancelEvent event) {
+//        int i = 1;
+//    }
 
     void ScanDirectory(File path){
         FileFilter filter = new FileFilter() {
@@ -124,16 +120,47 @@ public class MainActivity extends ActionBarActivity implements OnDirectoryChoose
         };
         File[] files = path.listFiles(filter);
         if(files != null & files.length != 0) {
-            //add to prefs
-            //select as def
+            currentRootDirectory = path;
+
+            SharedPreferences.Editor editor = settings.edit();
+            editor.putString("currentDir", currentRootDirectory.getAbsolutePath());
+            editor.apply();
+
             CreateFragments(files);
         }
-        else
-            Toast.makeText(this, "Picture not found", Toast.LENGTH_SHORT).show();
+        else {
+            ClearHistory(path);
+            String pathCurr = path.getAbsolutePath();
+            String deffFolder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).getAbsolutePath();
+            if(pathCurr.compareTo(deffFolder) != 0) {
+                Toast.makeText(this, "Picture not found. Go to deff", Toast.LENGTH_SHORT).show();
+                ScanDirectory(currentRootDirectory);
+            }
+            else
+                Toast.makeText(this, "Picture not found in deff folder even", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    void ClearHistory(File dirToRemove){
+        Set<String> histDir = settings.getStringSet("historyDir", new HashSet<String>());
+        histDir.remove(dirToRemove.getAbsolutePath());
+        SharedPreferences.Editor editor = settings.edit();
+        editor.putStringSet("historyDir", histDir);
+        editor.apply();
+
+        if(dirToRemove == currentRootDirectory){
+            currentRootDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+            editor = settings.edit();
+            editor.putString("currentDir", currentRootDirectory.getAbsolutePath());
+            editor.apply();
+        }
     }
 
     void CreateFragments(File[] pictures){
         LinearLayout photo_lt = (LinearLayout) findViewById(R.id.photo_lt);
+
+        photo_lt.removeAllViews();
+
         LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         layoutParams.gravity = Gravity.CENTER;
